@@ -1,2 +1,2 @@
 # Credit-Risk-Predictive-Analytics-Classification
-Machine Learning in R 
+Machine Learning and Data Mining in R 
