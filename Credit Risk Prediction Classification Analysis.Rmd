@@ -1,0 +1,1136 @@
+---
+title: "Project (Signature Assignment)"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+
+
+#### HARSH SHAH (001273963)
+
+#### DA5030 | 35664 | Intro Data Mining & Machine Learning | SEC 01 | Spring 2018
+
+
+### Project (Signature Assignment): "Credit Risk Prediction Classification Analysis" 
+
+#### This Signature Project provided me with an opportunity to complete a substantial effort where I can showcase my understanding of Data Mining and Machine Learning techniques that I studied in this course.
+
+
+#### Dataset: "Credit Card Fraud Detection" - https://www.kaggle.com/mlg-ulb/creditcardfraud/data
+
+
+#### Followed: Phases of CRISP-DM and Project Rubric format
+
+
+
+
+
+ 
+### Phase 1 - Business Understanding:
+
+#### Providing credits to the customer has certainly became a huge concerns for the banks nowadays. They eventually plans to proceed in a way to accurately identify the customer whether to be a defaulter or genuine.
+
+
+#### I will leverage Data Mining and Machine Learning techniques to provide the solutions to the banks in terms of evaluted and improved machine learning generalized predictive model which will analyze and classifies the risks related to providing credit to the customer with highest accuracy. 
+
+
+#### After productizing the model through the data-pipeline, banks will be able to evaluate and detect the risks involved in providing credit to the customer which will eventually help them reduce their capital loss and  business will consequently grow much faster.
+
+
+
+
+
+
+
+
+### Phase 2 - Data Understanding:
+
+#### Dataset contains transactions made by credit cards by European cardholders. Transactions presented have occurred in two days. There are total 31 feature variables including response variable, which depicts high dimensionality having 284,807 records of which 492 are labeled as fraud (i.e. 1) and rest as genuine (i.e. 0).
+
+
+#### The dataset contains only numeric input feature variables which are the result of PCA transformation. Due to confidentiality issues, bank cannot provide the original feature variables and more background information on it. AlThough this issue, we would be definitely capable to initiate the analysis and provision the precise &  more accurate results.
+
+
+#### Features V1 TO V28 are the principal components obtained through PCA while "Time" is the original feature which provides seconds elapsed within each transactions and first transaction in the dataset and "Amount" is the feature variable which contains the total amount of the specific transactions approved and are most importantly  original feature variables and not transformed with PCA. Feature "Class" is the target response variable with values having 1 as fraud and 0 as genuine.
+
+
+
+
+
+### (I) Data Acquisition:
+### (a) Acquisition of Data:
+```{r}
+creditcard <- read.csv("C:/Users/hshah/Desktop/DM-ML/Project/creditcard.csv/creditcard.csv")
+```
+
+
+
+#### Structure and Statistics of the Dataset
+```{r}
+str(creditcard)
+summary(creditcard)
+```
+
+
+
+#### Loading Required Packages
+```{r}
+library(tidyverse)
+library(ggthemes)
+library(knitr)
+library(tidyverse)
+library(caret)
+library(caretEnsemble)
+library(plotly)
+library(plotROC)
+library(pROC)
+library(ROCR)
+library(psych)
+library(ggplot2)
+library(class)
+library(e1071)
+library(caTools)
+library(gmodels)
+library(randomForest)
+```
+
+
+
+
+
+
+
+
+
+
+
+### Phase 3 - Data Preparation:
+
+#### This will involve exploratory data plots, detecting outliers and missing values, imputation methods, collinearity analysis, normalization, and feature engineering methods.
+
+
+
+### (II) Data Exploration:
+
+
+
+#### Let's Identify missing values before we explore the dataset further.
+```{r}
+# Identifying Missing Values
+colSums(is.na(creditcard))
+
+# Used colSums() function on the dataset to identify if there's any missing values in any columns of all with using is.na() function.
+```
+
+
+
+
+### (b) Exploratory Data Plots
+```{r}
+# Distribution of Class
+q <- ggplot(data = creditcard, aes(x=Class)) + geom_bar(position = position_dodge(), fill = "Gold", width = 0.5)+scale_x_discrete() + geom_text(stat = 'count', aes(label=..count..), vjust=0) + ggtitle("Distribution of Class")
+q                                                                                           
+
+#It is certain that number Fraud transactions are much less compared to the Genuine transactions. 
+```
+
+
+```{r}
+# Distribution of Transaction Amount by Class
+p <- ggplot(data=creditcard, aes(x=Class, y=Amount, label =Amount, fill = cond)) + geom_bar(position=position_dodge(), fill = "Red", width=0.5, stat = "identity", aes(fill = cond2))+scale_x_discrete() + ggtitle("Amount by Class")
+p
+
+#Aggregating total transaction amount used by bank in regards to "Genuine" & "Fraud" 
+amount_agg <- aggregate(Amount ~ Class, creditcard, sum)
+amount_agg
+
+p1 <- ggplot(data=amount_agg, aes(x=Class, y=Amount, label =Amount)) + geom_bar(position=position_dodge(), fill = "Red", width=0.5, stat = "identity")+scale_x_discrete() + ggtitle("Amount by Class") + geom_text(vjust=0)
+p1
+
+
+
+
+
+# BoxPlot for Amount by Class
+ggplot(data=creditcard, aes(Class, Amount, group=Class))+geom_boxplot(position=position_dodge(), outlier.colour="blue", outlier.shape=16,  outlier.size=2, notch=FALSE) + scale_x_discrete(limits=c(0,1))+ scale_fill_grey() 
+```
+####Fraud Transactions are of lower value from the results. Also, we know that number of fraud transactions are much less and hence apparantly we can conclude that amount would also be less unless large amount of transactions done to the defaulter. Which we will analyze further.
+
+
+
+
+```{r}
+# Histograms to visualize some PCA transformed features
+multi.hist(creditcard[, c(4,5,10,12,14,16)], density = TRUE, bcol="Blue", dcol=c("red","black"),dlty=c("dashed","dotted"), main = "Histogram")
+```
+
+
+
+
+
+### (c) Detecting Outliers:
+
+#### As we know that whole dataset has all feature variables with numeric input. Therefore, lets identify and locate the outlier through calculating descriptive statistics, and visualizing it. 
+
+#### Features from V1 to V28 (i.e. total 28 feature variables) are already a PCA transformed features and hence it's unlikely for them to have outliers, since their values fits around the value of o and 1.
+
+#### While other 2 feature variable (i.e. "Time" and "Amount") are numeric and mught have outliers lying in it. But both are the variables which eventually can be considered as features with legitimate values and we must consider them in order to further train and evalute the model.
+
+#### Besides, lets analyze central tendencies of features (i.e. mean and median of features) it proves to be not containing any outliers.
+```{r}
+summary(creditcard$Amount)
+
+a <- mean(creditcard$Amount)
+b <- sd(creditcard$Amount)
+
+z_score <- ((a) - (creditcard$Amount))/(b)
+
+z_score <- abs(z_score)
+
+outliers <- which(z_score>3)
+head(outliers)
+```
+
+#### As per the analysis from z-score for all records of the dataset, there seems to be many outliers considering the thresold of z-score>3. But, let's consider some domain knowledge here, and therefore we would not remove outliers detected in a column "Amount". The reason for doing this would be, firstly it's bank data and "Amount" is always remain the most significant factor in determining or predicting the goal of the project (i.e. "Class"). Besides, we are considering there are no constraints to the bank in giving out the loan to their customer. Hence, it could be acceptable to consider the distinct and non-uniformly distributed data on it.
+
+#### Therefore, we are not removing the outliers of a specific "Amount" column and will continue further analysis as per the requirements.
+
+
+
+
+
+
+### (d) Correlation/Collinearity Analysis:
+```{r}
+library(corrplot)
+correlations <- cor(creditcard,method="pearson")
+corrplot(correlations, method = "circle")
+```
+####It is certainly observed that there's no collinearity between any of the feature variables, which is acceptable because 28 (i.e. most of feature variable) are the transformed features and are called as principal components resulted through PCA.
+
+
+
+
+
+
+
+
+### (III) Data Cleaning & Shaping:
+
+
+### (e) Data Imputation:
+
+#### As we've identified earlier that our dataset (i.e. creditcard) doesn't contains any missing (i.e. NA values) or any outliers. Hence, there's no need to impute the data by any sense in our case.
+
+#### But, let's implement the imputation on a New.derived_df (i.e. creditcard dataset, including one derived features Cols.mean).
+
+#### We will impute outliers that we've determined previously for the "Amount" column using z-score standardization. Records having z_score > 3 would be considered outlier in this case for implementation and would be required to impute.
+
+#### We will implement "Average" imputation method. 
+```{r}
+New.derived_df <- data.frame(creditcard)
+
+New.derived_df[outliers,30] <- mean(New.derived_df$Amount)
+
+summary(creditcard$Amount)
+summary(New.derived_df$Amount)
+```
+#### We've imputed the outliers of the "Amount" column by Average imputation method. But, as I've explained earlier the important signicance of the "Amount" has on the prediction we will not consider imputation and continue further prediction analysis with original value of the "creditcard" dataset.
+
+#### This implementation is just for the sake of requirement in order to ensure that we are aware of such imputation methods and "Average" is one of them. 
+
+
+
+
+
+
+
+
+### (f) Normalization/Standardization of feature values:
+
+#### Normalization/Standrdization are the methods which plays an important role while before we plan to perform feature engineering on the them and then eventually figure out which are the variables that are statistically significant in order to use in training our model on the dataset. 
+
+#### Besides, there are many algorithms whose performance completely depends on the size, dimensionality, their values range, etc in order to predict output with maximum accuracy. That is where this methods comes in a role.
+```{r}
+summary(creditcard)
+```
+
+
+#### Lets perform Normalization/Standardization on only two feature variables "Amount" and "Time". Since, we know that out of 31 feature variables 28 are already PCA transformed features and hence there remains no need to perform standardization and perform PCA on them again. And last one is target variable "Class".
+```{r}
+dataf1 <- data.frame(creditcard)
+
+
+# Z-Score Standardization on "Amount"
+dataf1$Amount <- ((mean(creditcard$Amount)) - (creditcard$Amount))/(sd(creditcard$Amount))
+summary(dataf1$Amount)
+
+
+
+
+# Normalization on "Time"
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x))) }
+
+dataf1$Time <- normalize(creditcard$Time)
+summary(dataf1$Time)
+```
+
+
+
+
+
+
+### (g) Feature Engineering: Dummy Codes
+
+####As we're certainly aware of the fact that, full dataset contains 31 feature variables and all of which are numeric input variables. Hence, there's no need to create dummy code variables in order to satisfy the requirements to train the model.
+
+
+### (other) Feature Engineering: Identifying which features are statistically significant
+
+#### Before standardizing and PCA transforming all required features in order to train the model, let's build Multiple Regression model which will eventually help us to identify whether which features are worth performing further analysis.
+```{r}
+model_mult_reg <- lm(Class ~., data = creditcard)
+
+summary(model_mult_reg)
+```
+#### All features are determined as an statistically significant variables. 
+
+
+
+### (h) Feature Engineering: PCA
+
+#### Our  feature variable V1 TO V28 are already PCA transformed principal components. 
+#### We'll perform PCA transformation feature engineering on "Amount" and "Time" with Normalized and Standardized dataset "Dataf1"
+```{r}
+# Created variable/dataframe of two columns "Amount" & "Time"
+std_col <- dataf1[,c(1,30)]      
+summary(std_col)
+str(std_col)
+
+
+# Used "prcomp()" of stats package to PCA transform the features
+pca_transformed <- prcomp(std_col)   
+
+
+summary(pca_transformed)
+print(pca_transformed)
+
+
+# Loadings of the features records
+head(pca_transformed$x)         
+dim(pca_transformed$x)
+```
+
+
+#### Lets combine and make a final dataframe of statistically significant-PCA transformed feature variables. 
+```{r}
+#Combining specific columns from both/different dataframes
+dataf2 <- data.frame(dataf1[, c(2:29,31)], pca_transformed$x)    
+
+
+#Reordering the columns, to ensure any mistakes to happen further
+dataf2 <- dataf2[c(30,1:28,31,29)]  
+
+
+#Changing column name to the original from "PC1" (i.e. Time)
+names(dataf2)[1] <- paste("Time") 
+#Changing column name to the original from "PC2" (i.e. Amount)
+names(dataf2)[30] <- paste("Amount") 
+
+
+str(dataf2)
+```
+#### After analyzing the structure and significance of the features now, ther's no need to perform forward/backward fitting using either AIC, p-value or Adjusted R-squared approaches, since every feature variables happens to be statistically significant to further consider in training the predictive model. 
+
+
+
+
+
+
+
+### (i) Feature Engineering: New Derived Features
+
+#### This dataset doen't really require any necessary derived features. But, I will try deriving new features accordingly and give effort to improve the model and compare it to one without derived features and then analyze that why and how they differ in a sense to predict the classification with maximum accuracy with it's robust model.
+```{r}
+New.derived_df1 <- data.frame(creditcard)
+summary(New.derived_df1$Amount)
+
+New.derived_df1$Cols.mean = apply(New.derived_df1[,c(2:30)],1,mean)
+str(New.derived_df)
+
+New.derived_df1$Cols.mean <- abs(New.derived_df1$Cols.mean)
+
+# Multiple Regression model
+try_mult <- lm((Class)~.,data = New.derived_df1)
+summary(try_mult)
+```
+#### After training a multiple regression model including our new derived feature, it seems that Cols.mean is not a statistically significant variable with p-value = 0.089 (i.e. >0.05) and therefore it won't be making any sense to consider in our further analysis to train a robust predictive machine learning model.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Phase 4 - Modeling:
+
+
+
+
+### (j) Creating of Training & Validation subsets:
+
+#### Before executing the method to subset the dataset, let's determine the proportion of "Class" variable. Because, in order to avoid overfitting/underfitting the data and carry out the prediction classification accurately; we have to ensure the proportion of the "class" (i.e.target variable) and should be in both Training and Validation dataset as a Stratifies dataset.
+```{r}
+table(dataf2$Class)
+prop.table(table(dataf2$Class))*100
+# Proportion depicts 99.83% - Genuine and 0.17% - Fraud in full dataset and is randomly fitted in records.
+```
+
+
+#### Firstly before partitioning the dataset in Training and Testing, let's ensure and convert the target variable into the factor type. Since most of the supervised machine learning algorithm are created using that data-type as a target variable.
+```{r}
+dataf3 <- data.frame(dataf2)
+dataf3$Class <- as.factor(dataf3$Class)
+
+prop.table(table(dataf3$Class))
+```
+
+
+#### In order to partition data in a stratified format as in with the same proportion of "class" variable distributed/splited in both training and testing dataset, let's use "caret" package and further perform the task.
+
+#### We know that our dataset in highly dimensional with 31 feature variables and 284807 records. Each machine learning algorithms takes high computation time (i.e. around 45-60 mins) to build/train the model on such big dataset (i.e. this case: 213605 records (75% of full data)). 
+
+#### Hence, we would be working on the 25% of the data of the full dataset; which comes around 71202 records.
+
+#### The partition of the sample dataset (i.e. 25% data of the full dataset) would in a ratio of 75%-training and 25%-testing.
+```{r}
+set.seed(123)  #To ensure reusablity of the data to create the same results
+
+data.credit <- sample(1:nrow(dataf3), round(0.25*nrow(dataf3)))
+dataf3 <- dataf3[data.credit,]
+
+partition <- createDataPartition(y = dataf3$Class, p = 0.75, list = FALSE)  #Split-ratio for training:testing is 75:25 percent respectively.
+
+credit_training <- dataf3[partition, ]  #Training dataset
+credit_testing <- dataf3[-partition, ]  
+
+
+table(credit_training$Class)
+prop.table(table(credit_training$Class))*100
+
+table(credit_testing$Class)
+prop.table(table(credit_testing$Class))*100
+```
+
+
+#### Seperated features variables and response variable by giving different vectors, in order to use to train the model and it's use depends case to case (i.e. model to model)
+```{r}
+train_features <- credit_training[,1:30]
+train_class <- credit_training[,31]
+
+test_features <- credit_testing[,1:30]
+test_class <- credit_testing[,31]
+
+prop.table(table(train_class))*100
+prop.table(table(test_class))*100
+```
+
+
+
+#### Let's make it certain, training a model on large dataset takes high computation time so for specific to that reason we'll train our model on a training data of sample dataset; as I already made it clear. 
+
+#### But, in order to predict the classification; we can definitely use the full test dataset (i.e. 25% of full dataset). 
+
+#### Therefore, let's partition the data on the full dataset (i.e. original dataset) with 25%-testing and rest training considering equal proportion of the "class". 
+
+#### We will just use the test dataset from this against prediting the classification on model.
+```{r}
+dataf3_fulldata <- data.frame(dataf2)
+dataf3_fulldata$Class <- as.factor(dataf3_fulldata$Class)
+
+set.seed(123)
+
+partition_fulldata <- createDataPartition(y = dataf3_fulldata$Class, p = 0.75, list = FALSE)  #Split-ratio for training:testing is 75:25 percent respectively.
+
+credit_training_fulldata <- dataf3_fulldata[partition_fulldata, ] 
+credit_testing_fulldata <- dataf3_fulldata[-partition_fulldata, ]  #Testing dataset
+
+
+table(credit_training_fulldata$Class)
+prop.table(table(credit_training_fulldata$Class))*100
+
+table(credit_testing_fulldata$Class)
+prop.table(table(credit_testing_fulldata$Class))*100
+
+test_features_fulldata <- credit_testing_fulldata[,1:30]
+test_class_fulldata <- credit_testing_fulldata[,31]
+```
+
+
+
+
+
+
+
+
+
+### (k) Construction of atleast three models:
+
+#### Our goal is to train one highly preferable and robust machine learning model which can be taken in deployment and improves the performance of the firm. 
+
+#### Firstly, let's try and build every possible supervised machine learning models. Then we'll evaluate them basis on absolute accuracy and AUC. After doing so, we'll use 3-4 best machine learning models to further evaluate the fit and to perform further analysis which helps us to reach our goal. 
+
+
+
+
+# Model 1: k-Nearest Neighbor Classifier
+
+#### Using "class" package & "knn()" function
+```{r}
+library(class)
+
+pred_knn <- knn(train = train_features, test = test_features_fulldata, cl = train_class, k=5)
+```
+
+
+#### Evaluation of the model with Absolute Accuracy and AUC  against the testing dataset; which is partitioned on full dataset.
+```{r}
+library(caret)
+confusionMatrix(pred_knn, test_class_fulldata) 
+
+library(pROC)
+
+roc_kNN <- roc(as.numeric(test_class_fulldata), as.numeric(pred_knn))
+
+plot.roc(roc_kNN, col="Red", lwd=3, main = "ROC for kNN")
+
+auc(roc_kNN)  #Area under the curve: 0.8780136
+```
+
+
+
+
+
+
+
+# Model 2: Naive Bayes 
+
+#### Using "e1071" package & "naiveBayes()" function
+```{r}
+library(e1071)
+
+model_NB <- naiveBayes(train_features, train_class)
+pred_NB <- predict(model_NB, credit_testing_fulldata)
+```
+
+#### Evaluation of the model with Absolute Accuracy and AUC - Naive Bayes against the testing dataset; which is partitioned on full dataset.
+```{r}
+confusionMatrix(pred_NB, test_class_fulldata)  
+
+library(pROC)
+
+roc_NB <- roc(as.numeric(test_class_fulldata), as.numeric(pred_NB))
+
+plot.roc(roc_NB, col="Blue", lwd=3, main = "ROC for Naive Bayes")
+
+auc(roc_NB)
+```
+
+
+
+
+
+
+# Model 3: Decision Trees
+
+#### Using "C50" package & "C5.0()" function
+```{r}
+library(C50)
+
+model_Dec.trees <- C5.0(train_features, train_class)
+model_Dec.trees
+
+summary(model_Dec.trees)
+
+pred_Dec.trees <- predict(model_Dec.trees, credit_testing_fulldata)
+```
+
+#### Evaluation of the model with Absolute Accuracy and AUC - Decision Trees against the testing dataset; which is partitioned on full dataset.
+```{r}
+confusionMatrix(pred_Dec.trees, test_class_fulldata)  
+
+library(pROC)
+
+roc_Dec.trees <- roc(as.numeric(test_class_fulldata), as.numeric(pred_Dec.trees))
+
+plot.roc(roc_Dec.trees, col="Gold", lwd=3, main = "ROC for Decision Trees")
+
+auc(roc_Dec.trees)
+```
+
+
+
+
+
+
+
+
+# Model 4: Logistic Regression
+
+#### As we know that, Logistic regression results into the probabilities of the binary class variables. It will require the "class" variable in a numeric format. Therefore, performed partitioning on the dataset again with "class" variable in a same datatype of "numeric"
+
+#### Training/Testing for Logistic Regression
+```{r}
+dataf4_Logistic <- data.frame(dataf2) 
+str(dataf4_Logistic)
+
+set.seed(123)
+
+library(caTools)
+
+partition_Logistic <- sample.split(dataf4_Logistic$Class, SplitRatio = 0.75)
+
+credit_training_Logistic <- subset(dataf4_Logistic, partition_Logistic == TRUE)
+credit_testing_Logistic <- subset(dataf4_Logistic, partition_Logistic == FALSE)
+
+dim(credit_training_Logistic)
+dim(credit_testing_Logistic)
+prop.table(table(credit_training_Logistic$Class))
+prop.table(table(credit_testing_Logistic$Class))
+```
+
+
+#### Using "stats" package & "glm()" function
+```{r}
+model_Logistic <- glm(credit_training_Logistic$Class ~ ., data = credit_training_Logistic, family = "binomial")
+
+summary(model_Logistic)
+
+
+pred_Logistic <- predict(model_Logistic, credit_testing_Logistic,  type = "response")
+
+actuals_preds <- data.frame(cbind(actuals=credit_testing_Logistic$Class, predicteds=pred_Logistic))
+
+head(actuals_preds)
+
+actuals_preds$predicteds <- ifelse(actuals_preds$predicteds>0.5,1,0)
+```
+
+#### Evaluation of the model with Absolute Accuracy and AUC - Logistic against the testing dataset; which is partitioned on full dataset.
+```{r}
+library(gmodels)
+CrossTable(actuals_preds$actuals, actuals_preds$predicteds)
+
+library(caret)
+confusionMatrix(actuals_preds$predicteds, actuals_preds$actuals) 
+
+library(pROC)
+
+roc_Logistic <- roc(as.numeric(actuals_preds$actuals), as.numeric(actuals_preds$predicteds))
+
+plot.roc(roc_Logistic, col="Green", lwd=3, main = "ROC for Logistic Regression")
+
+auc(roc_Logistic)
+```
+
+
+
+
+
+
+# Model 5 - Random Forest
+
+#### Using "randomforest" package & randomForest() function
+```{r}
+library(randomForest)
+
+model_RF <- randomForest(credit_training$Class ~., data = credit_training)
+summary(model_RF)
+print(model_RF)
+
+pred_RF <- predict(model_RF, credit_testing_fulldata)
+```
+
+#### Evaluation of the model with Absolute Accuracy and AUC - Random Forest against the testing dataset; which is partitioned on full dataset.
+```{r}
+confusionMatrix(pred_RF, credit_testing_fulldata$Class)
+
+library(pROC)
+
+roc_RF <- roc(as.numeric(test_class_fulldata), as.numeric(pred_RF))
+
+plot.roc(roc_RF, col="Blue", lwd=3, main = "ROC for RF")
+
+auc(roc_RF) 
+```
+
+
+
+
+
+
+# Model 6 - Support Vector Machine
+
+#### Using "kernlab" package & "ksvm()" function
+```{r}
+library(kernlab)
+
+model_SVM <- ksvm(credit_training$Class ~ ., data = credit_training, kernel = "rbfdot")
+
+model_SVM
+
+pred_SVM <- predict(model_SVM, credit_testing_fulldata)
+```
+
+#### Evaluation of the model with Absolute Accuracy and AUC - Support Vector Machine against the testing dataset; which is partitioned on full dataset.
+```{r}
+confusionMatrix(pred_SVM, credit_testing_fulldata$Class)
+
+library(pROC)
+
+roc_SVM <- roc(as.numeric(test_class_fulldata), as.numeric(pred_SVM))
+
+plot.roc(roc_SVM, col = 3, main = "ROC for SVM")
+
+auc(roc_SVM)
+```
+
+
+
+
+
+
+
+### (o) Comparing/Evaluating Accuracy of individually created models using AUC/ROC:
+```{r}
+library(ROCR)
+
+predictions_list <- list(as.numeric(pred_knn), as.numeric(pred_NB),as.numeric(pred_Dec.trees),as.numeric(pred_RF),as.numeric(pred_SVM))
+
+d <- length(predictions_list)
+
+actualsvalue_list <- rep(list(as.numeric(credit_testing_fulldata$Class)), d)
+
+frame <- prediction(predictions_list, actualsvalue_list)
+
+rocs_frame <- performance(frame, "tpr", "fpr")
+
+plot(rocs_frame, col = as.list(1:d), main = "Comparing ROC of trained models", lwd=3 , pch=17)
+legend("bottomright", c("k-NN","Naive Bayes","Decision Trees", "Random Forest", "SVM"), fill = 1:d)
+```
+
+#### After analyzing the evaluation of our individually constructed model by Absolute Accuracy and AUC, we've decided to perform further detailed evaluation and improvement on just 3 machine learning predictive models. 
+
+
+
+
+
+
+
+
+
+#### Brief:- Evaluating best 3 from amongst 6 trained models
+
+
+#### They are: (1) k-Nearest Neighbor, (2) Naive Bayes & (3) Random Forest
+
+#### We'll perform each and every techniques and methods to build the model as per the requirement and ensure the success after deployment of the same.
+
+#### Considering and ease to understand, we'll try to perform each techniques/steps seperately under each specific model.
+
+
+
+
+
+
+# Phase - 5: Evaluation:
+
+#### Let's create partitions on the dataset. We will work on sample (i.e. 25% of the full dataset), since we are require to train the model and we will apparently do using the same ans we've performed before above. 
+
+#### We'll partition it in 50%-Training, 25%-Testing & rest 25%-Validation 
+```{r}
+set.seed(723)
+split <- sample(1:3, size=nrow(dataf3), replace=TRUE, prob=c(0.5,0.25,0.25))
+handout_train <- dataf3[split == 1,]      #Used to train the model
+handout_test <- dataf3[split == 2,]
+handout_validation <- dataf3[split == 3,]
+
+dim(handout_train)
+dim(handout_test)
+dim(handout_validation)
+
+prop.table(table(handout_train$Class))
+prop.table(table(handout_test$Class))
+prop.table(table(handout_validation$Class))
+
+#Seperating features and class for training dataset; we are going to use.
+handout_train_features <- handout_train[,1:30]
+handout_train_class <- handout_train[,31]
+```
+#### Here after, Dataset is partitioned into three seperate dataset from amongst which, we'll perform training of a model on handout_training, testing on "handout_test" and again perform testing on "handout_validation" (i.e. to determine if the model performance is generalized and not overfitting/underfitting by any chance) and if there seems an issue of fitting of the model on the testing datasets then we must have to avoid using it of improved it in way to ignore such failures.
+
+
+#### In order to be more precise about the results, we'll partition the same proportion of the dataset for full dataset (i.e original) and use the testing and validation data given by them.
+```{r}
+set.seed(723)
+split_fulldata <- sample(1:3, size=nrow(dataf3_fulldata), replace=TRUE, prob=c(0.5,0.25,0.25))
+handout_train_fulldata <- dataf3_fulldata[split == 1,]      
+handout_test_fulldata <- dataf3_fulldata[split == 2,]        #Used to test the model
+handout_validation_fulldata <- dataf3_fulldata[split == 3,]  #Used to test the model
+
+dim(handout_train_fulldata)
+dim(handout_test_fulldata)
+dim(handout_validation_fulldata)
+
+prop.table(table(handout_train_fulldata$Class))
+prop.table(table(handout_test_fulldata$Class))
+prop.table(table(handout_validation_fulldata$Class))
+
+#Seperating features and class for testing data; which we are going to use
+handout_test_features <- handout_test_fulldata[,1:30]
+handout_test_class <- handout_test_fulldata[,31]
+
+#Seperating features and class for validation data; which we are going to use
+handout_validation_features <- handout_validation_fulldata[,1:30]
+handout_validation_class <- handout_validation_fulldata[,31]
+```
+
+
+
+
+
+
+
+
+
+# (1) K-Nearest Neighbor: 
+
+### (l) Evaluation of fit of models with holdout method - kNN:
+```{r}
+library(class)
+
+pred_knn_handout <- knn(train = handout_train_features, test = handout_test_features, cl = handout_train_class, k=5) #Against test dataset
+
+pred_knn_handout.1 <- knn(train = handout_train_features, test = handout_validation_features, cl = handout_train_class, k=5) #Against validation dataset
+```
+
+
+#### Evaluation of the fit of model with Absolute Accuracy - k-Nearest Neighbor against the testing  & validation dataset; which is partitioned on full dataset to determine and ensure the fitting of the model on the data to be generalized. 
+```{r}
+library(caret)
+
+confusionMatrix(pred_knn_handout, handout_test_class)
+
+confusionMatrix(pred_knn_handout.1, handout_validation_class) 
+```
+#### We can say that, results of prediction classification are most probably giving the generalized output and hence, k-NN model is fit and accurate to use further for analysis. 
+
+
+
+
+
+
+
+### (m) Evaluation with k-fold cross-validation - kNN:
+```{r}
+knn.fit <- train(factor(Class) ~ ., data = dataf3, method = "knn", trControl = trainControl(method = "cv", number = 2, selectionFunction = "best", verboseIter = TRUE)) 
+
+knn.fit
+```
+
+
+
+
+
+
+### (n) Tuning of models - kNN:
+
+#### After evaluation with k-fold cross validation. It is fitting k = 9 on full training dataset.
+#### Let's tune the model by applying execution to train the model - kNN with parameter k = 9  
+```{r}
+library(class)
+pred_kNN_tuned <- knn(train = train_features, test = test_features_fulldata, cl = train_class, k = 9)
+```
+
+#### Evaluation of tuned model "k-NN" - individual model analysis with Absolute Accuracy & AUC:
+```{r}
+confusionMatrix(pred_kNN_tuned, test_class_fulldata)
+
+library(pROC)
+
+roc_kNN_tuned <- roc(as.numeric(test_class_fulldata), as.numeric(pred_kNN_tuned))
+
+plot.roc(roc_kNN_tuned, col="Black", lwd=3, main = "ROC for Improved kNN")
+
+auc(roc_kNN_tuned) 
+```
+
+
+
+
+
+
+
+
+
+
+
+# (2) Naive Bayes:
+
+### (l) Evaluation of fit of models with holdout method - Naive Bayes: 
+```{r}
+library(e1071)
+
+model_NB_handout <- naiveBayes(handout_train_features, handout_train_class, laplace = 1)
+
+
+pred_NB_handout <- predict(model_NB_handout, handout_test_fulldata) #Against test dataset
+
+pred_NB_handout.1 <- predict(model_NB_handout, handout_validation_fulldata) #Against validation dataset
+```
+
+
+#### Evaluation of the fit of model with Absolute Accuracy - Naive Bayes against the testing & validation dataset; which is partitioned on full dataset to determine and ensure the fitting of the model on the data to be generalized. 
+```{r}
+confusionMatrix(pred_NB_handout, handout_test_class)
+
+confusionMatrix(pred_NB_handout.1, handout_validation_class)
+```
+#### We can say that, results of prediction classification are most probably giving the generalized output and hence, Naive Bayes model is fit and accurate to use further for analysis. 
+
+
+
+
+### (m) Evaluation with k-fold cross-validation - Naive Bayes:
+```{r}
+#NB.fit <- train(factor(Class) ~ ., data = dataf3, method = "nb", trControl = trainControl(method = "cv", number = 3, selectionFunction = "best", verboseIter = TRUE)) 
+```
+#### Since, the NaiveBayes works on a probabilistic classification, we are not going to perform k-fold cross validation on Naive-Bayes.
+#### Besides, we are getting highest AUC for original model, and therefore seems no need to perform the same.
+
+
+
+
+### (n) Tuning of models - Naive Bayes:
+```{r}
+library(e1071)
+
+model_NB_tuned <- naiveBayes(train_features, train_class, laplace = 1) #Included Laplace parameter to tune the accuracy of the classifier
+pred_NB_tuned <- predict(model_NB_tuned, credit_testing_fulldata)
+```
+
+
+#### Evaluation of tuned model "Naive Bayes" - individual model analysis with Absolute Accuracy & AUC:
+```{r}
+confusionMatrix(pred_NB_tuned, credit_testing_fulldata$Class)
+
+library(pROC)
+
+roc_NB_tuned <- roc(as.numeric(test_class_fulldata), as.numeric(pred_NB_tuned))
+
+plot.roc(roc_NB_tuned, col="Red", lwd=3, main = "ROC for Improved Naive Bayes")
+
+auc(roc_NB_tuned) 
+```
+
+
+
+
+
+# (3) Random Forest:
+
+### (l) Evaluation of fit of models with holdout method - Random Forest:
+```{r}
+library(randomForest)
+
+model_RF_handout <- randomForest(handout_train$Class ~., data = handout_train)
+summary(model_RF_handout)
+print(model_RF_handout)
+
+pred_RF_handout <- predict(model_RF_handout, handout_test_fulldata) #Against test dataset
+pred_RF_handout.1 <- predict(model_RF_handout, handout_validation_fulldata) #Against validation dataset
+```
+
+#### Evaluation of the fit of model with Absolute Accuracy - Random Forest against the testing  & validation dataset; which is partitioned on full dataset to determine and ensure the fitting of the model on the data to be generalized. 
+```{r}
+confusionMatrix(pred_RF_handout, handout_test_class)  
+
+confusionMatrix(pred_RF_handout.1, handout_validation_class)
+```
+#### We can say that, results of prediction classification are most probably giving the generalized output and hence, Random Forest model is fit and accurate to use further for analysis.
+
+
+
+
+### (m) Evaluation with k-fold cross-validation - Random Forest:
+```{r}
+RF.fit <- train(factor(Class) ~ ., data = dataf3, method = "rf", trControl = trainControl(method = "cv", number = 2, selectionFunction = "best", verboseIter = TRUE)) 
+
+RF.fit
+```
+
+
+
+
+### (n) Tuning of models - Random Forest:
+```{r}
+library(randomForest)
+
+model_RF_tuned <- randomForest(credit_training$Class ~., data = credit_training, ntree = 80, norm.votes = FALSE, importance = T, mtry = 16)
+
+summary(model_RF_tuned)
+print(model_RF_tuned)
+
+pred_RF_tuned <- predict(model_RF_tuned, credit_testing_fulldata)
+```
+
+
+#### Evaluation of tuned model "Random Forest" - individual model analysis with Absolute Accuracy & AUC:
+```{r}
+confusionMatrix(pred_RF_tuned, credit_testing_fulldata$Class)
+
+library(pROC)
+
+roc_RF_tuned <- roc(as.numeric(test_class_fulldata), as.numeric(pred_RF_tuned))
+
+plot.roc(roc_RF_tuned, col="Green", lwd=3, main = "ROC for Improved Random Forest")
+
+auc(roc_RF_tuned) 
+```
+
+
+
+
+
+
+
+
+
+
+### (O) Comparision of tuned/improved models:
+
+####Let's compare each trained models with it's AUC (i.e. Area Under Curve)
+```{r}
+library(pROC)
+library(ROCR)
+
+table(pred_kNN_tuned)
+table(pred_NB_tuned)
+table(pred_RF_tuned)
+
+preds_list <- list(as.numeric(pred_kNN_tuned), as.numeric(pred_NB_tuned), as.numeric(pred_RF_tuned))
+
+m <- length(preds_list)
+
+actuals_list <- rep(list(as.numeric(credit_testing_fulldata$Class)), m)
+
+pred <- prediction(preds_list, actuals_list)
+
+rocs <- performance(pred, "tpr", "fpr")
+
+plot(rocs, col = as.list(1:m), main = "Comparing ROC for Improved models",lwd=3 , pch=17)
+legend("bottomright", c("k-NN","Naive Bayes","Random Forest"), fill = 1:m)
+```
+
+
+
+
+
+
+### (p) Interpretations of results:
+After training best three models (i.e. "k-NN", "NaiveBayes" & "Random Forest") and evaluating with handout method and k-fold cross validation, we've build the improved accuracy machine learning models of all. Besides, after comparing all three tuned models with "Absolute Accuracy" & "AUC/ROC" we can conclude that Naive Bayes has highest AUC=0.9155, following comes Random Forest with AUC=0.8943 and k-NN with least amongst all three with AUC=0.8617. 
+
+Hence, comparatively all the trained models works and are proved be achieving good percent of accuracy in performing predictive classification of the target variable. 
+
+Now, let's build a Stacked Ensemble model which will eventually combine the predictions of all the primary models (i.e. of different types). 
+
+
+
+
+
+
+
+
+# Phase 6 - Deployment:
+
+
+
+### (q) Construction of stacked ensemble model:
+
+#### Voting (i.e. Stacked Learner)
+```{r}
+# The majority vote of all trained, evaluated and tuned machine learning model:
+pred_majority <- (ifelse(pred_RF_tuned==0 & pred_kNN_tuned==0,0,ifelse(pred_RF_tuned==0 & pred_NB_tuned==0,0,ifelse(pred_kNN_tuned==0 & pred_NB_tuned==0,0,1))))
+
+
+summary(pred_majority)
+table(pred_majority)
+```
+
+
+#### Evaluating the Stacked Ensemble model based on Absolute Accuracy & AUC:
+```{r}
+# Absolute Accuracy:
+confusionMatrix(pred_majority, credit_testing_fulldata$Class)
+
+# AUC/ROC:
+library(pROC)
+
+vote_preds <- as.numeric(pred_majority)
+vote_actuals <- as.numeric(credit_testing_fulldata$Class)
+
+vote_pred <- prediction(vote_preds, vote_actuals)
+
+rocs_voted <- performance(vote_pred, "tpr", "fpr")
+
+plot(rocs_voted, main = "ROC for Stacked Learner",lwd=3 , pch=17, col = "Green")
+
+auc(vote_preds, vote_actuals, partial.auc = FALSE)
+```
+
+#### After Evaluating the performance of our stacked learner model, which is trained by combining the predictions of our "3" improved/tuned primary models; we can definitely provision the Bank our model in order to deploy and further eventually determine the Risk associated with the customer by leveraging the data of his/her credit history and hence eventually decides whether the customer is "Fraud"  or "Genuine".  
+
+#### Absolute Accuracy = 0.9995
+#### Area Under Curve (AUC) = 0.954
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
